@@ -102,8 +102,6 @@ module.exports = NodeHelper.create({
 		//options are timestamp format, today for midnight + 0.0001 seconds today, or age in minutes
 		//determine the format of the data in age
 
-		console.log(age);
-
 		var filterDate = new Date();
 
 		if (typeof (age) == 'number') {
@@ -348,10 +346,6 @@ module.exports = NodeHelper.create({
 		client.get(query, params, function (error, tweets, response) {
 			// if no error, send tweets for processing
 
-			console.log("-----------------");
-			console.log(client);
-			console.log(query, params);
-
 			if (!error) {
 
 				//create a psuedo meta object
@@ -410,8 +404,6 @@ module.exports = NodeHelper.create({
 		var includedTweetList = [];
 		var userTweetCountList = {};
 		var nowTime = Date.now();
-
-		console.log(this.name + " #### tweets.length " + tweets.length);
 
 		if (self.debug) { self.logger[moduleinstance].info("feedparser readable: "); }
 

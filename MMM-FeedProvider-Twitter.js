@@ -70,8 +70,8 @@ Module.register("MMM-FeedProvider-Twitter", {
 
     notificationReceived: function (notification, payload, sender) {
 
-        console.log(this.name + " recevived notification: " + notification + " with payload:");
-        console.log(JSON.stringify(payload));
+        //console.log(this.name + " recevived notification: " + notification + " with payload:");
+        //console.log(JSON.stringify(payload));
             ;
         if (sender) {
             Log.log(this.name + " received a module notification: " + notification + " from sender: " + sender.name);
@@ -164,8 +164,8 @@ Module.register("MMM-FeedProvider-Twitter", {
 			// the node helper uses a date on an item to determine which ones to send
 			// so we have to assume that we wont get duplicates - maybe can add checking laters
 
-			console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> " + nhpayload.payloadformodule.length);
-			console.log(nhpayload.payloadformodule);
+			//console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> " + nhpayload.payloadformodule.length);
+			//console.log(nhpayload.payloadformodule);
 
 			nhpayload.payloadformodule.forEach(function (stuffitem) {
 
@@ -233,7 +233,7 @@ Module.register("MMM-FeedProvider-Twitter", {
 					fdp.sourcetitle = nhpayload.source.sourcetitle;
 					fdp.payload = payload.stuffitems;
 
-					console.log(this.identifier + "  >>>>>> Sending data: " + fdp.title + " " + fdp.consumerid + " " + fdp.providerid + " " + payload.stuffitems.length);
+					//console.log(this.identifier + "  >>>>>> Sending data: " + fdp.title + " " + fdp.consumerid + " " + fdp.providerid + " " + payload.stuffitems.length);
 
 					this.sendNotification('FEED_PROVIDER_DATA', fdp);
 				}
