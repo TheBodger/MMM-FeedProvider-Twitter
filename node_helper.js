@@ -19,11 +19,11 @@
 var NodeHelper = require("node_helper");
 var moment = require("moment");
 
-var FeedParser = require('feedparser');
-var request = require('request'); // for fetching the feed
+//var FeedParser = require('feedparser');
+//var request = require('request'); // for fetching the feed
 
-const axios = require('axios');
-const fs = require('fs').promises;
+//const axios = require('axios');
+//const fs = require('fs').promises;
 
 const Twitter = require('twitter');
 
