@@ -18,8 +18,8 @@
     "provider"
   ],
   "dependencies": {
-    "axios": "latest",
-    "winston": "latest"
+    "moment": "latest",
+    "twitter": "latest"
   },
   "license": "MIT",
   "bugs": {
