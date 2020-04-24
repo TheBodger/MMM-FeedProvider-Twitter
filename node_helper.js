@@ -55,7 +55,7 @@ var latestfeedpublisheddate = new Date(0) // set the date so no feeds are filter
 module.exports = NodeHelper.create({
 
 	start: function () {
-		this.debug = true;
+		this.debug = false;
 		console.log(this.name + ' node_helper is started!');
 		this.logger = {};
 		this.logger[null] = LOG.createLogger("MMM-FeedProvider-Twitter-node_helper" + ".log", this.name);
