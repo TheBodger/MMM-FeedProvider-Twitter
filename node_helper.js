@@ -1,10 +1,31 @@
-var NodeHelper = require("node_helper");
+//this loads tweets depending on its config when called to from the main module
+//to minimise activity, it will track what data has been already sent back to the module
+//and only send the delta each time
 
+//this is done by making a note of the last published data of tweets sent to the module tracked at the tweet seach key level
+//and ignoring anything older than that
+
+//as some tweets wont have a published date, they will be allocated a pseudo published date of the latest published date in the current processed feeds
+
+//if the module calls a RESET, then the date tracking is reset and all data will be sent 
+
+//this is copies from other MMM-FeedPRovider modules and uses a common terminoly of feed, feeds. this simply represent the incoming
+//information and doesnt represent what the actual data is
+//only the core changes will appear differently and reference the actual purpose of the module.
+
+//nodehelper stuff:
 //this.name String The name of the module
 
-//global Var
+var NodeHelper = require("node_helper");
+var moment = require("moment");
 
-var isprofanity = require("isprofanity");
+//var FeedParser = require('feedparser');
+//var request = require('request'); // for fetching the feed
+
+//const axios = require('axios');
+//const fs = require('fs').promises;
+
+const Twitter = require('twitter');
 
 //pseudo structures for commonality across all modules
 //obtained from a helper file of modules
@@ -14,382 +35,128 @@ var RSS = require('../MMM-FeedUtilities/RSS');
 var QUEUE = require('../MMM-FeedUtilities/queueidea');
 var UTILITIES = require('../MMM-FeedUtilities/utilities');
 
+// structures
+
+var rsssource = new RSS.RSSsource();
+
+// local variables, held at provider level as this is a common module
+//these are largely for the authors reference and are not actually used in thsi code
+
+var providerstorage = {};
+
+var trackingfeeddates = []; //an array of last date of feed recevied, one for each feed in the feeds index, build from the config
+var aFeed = { lastFeedDate: '', feedURL: '' };
+
+var payloadformodule = []; //we send back an array of identified stuff
+var payloadstuffitem = { stuffID: '', stuff: '' }
+
+var latestfeedpublisheddate = new Date(0) // set the date so no feeds are filtered, it is stored in providerstorage
+
 module.exports = NodeHelper.create({
 
 	start: function () {
-
 		this.debug = true;
-
-		console.log(this.name + ' is started!');
-		this.consumerstorage = {}; // contains the config and feedstorage
-
-		this.currentmoduleinstance = '';
+		console.log(this.name + ' node_helper is started!');
 		this.logger = {};
-
-	},
-
-	setconfig: function (aconfig) {
-
-		var moduleinstance = aconfig.moduleinstance;
-		var config = aconfig.config;
-
-		//store a local copy so we dont have keep moving it about
-
-		this.consumerstorage[moduleinstance] = { config: config, feedstorage: {} };
-
-		this.alternatefeedorder = (this.consumerstorage[moduleinstance].config.article.mergetype.toLowerCase() == 'alternate'); // get an easier boolean to work with
-
-	},
-
-	categorymatch: function (categories, moduleinstance) {
-
-		//make sure the passed categories are converted to an array and to lower case before match against the config list
-
-		if (this.consumerstorage[moduleinstance].config.article.ignorecategorylist.length == 0) { return false;}
-
-		var categoryarray = categories;
-
-		if (!Array.isArray(categories)) { categoryarray = [categories] };
-
-		categoryarray = categoryarray.map(v => v.toLowerCase())
-
-		return categoryarray.some(v => this.consumerstorage[moduleinstance].config.article.ignorecategorylist.indexOf(v) != -1);
-
-    },
-
-	processfeeds: function (newfeeds) {
-
-		var self = this;
-
-		var moduleinstance = newfeeds.moduleinstance; //needed so the correct module knows what to do with this data
-		var payload = newfeeds.payload;
-
-		//depending on the config options for this moduleinstance
-
-		//articlemergefeeds: false,		merge all feed details before applying the order type
-		//								alternate - merge by taking alternate articles from each feed(i.e. 1st, 1st, 1st, 2nd, 2nd, 2nd, 3rd, 3rd, 4th), 
-		//									will apply sort order before merging 
-		//articleordertype: 'default',	//options are default, date(same as age), age,
-		//articleorder: 'ascending',	//options are ascending or descending
-
-		//if we are keeping the feeds separate, then we will have to use the provided feed title as a key into the feedstorage
-		//otherwise we will use a key of "merged feed"
-
-		switch (this.consumerstorage[moduleinstance].config.article.mergetype.toLowerCase()) {
-			case 'merge':
-				var feedstorekey = 'merged feed';
-				break;
-			case 'alternate':
-				var feedstorekey = payload.title; // uses the same as for default, alternate merging happens after the sort
-				break;
-			default:
-				var feedstorekey = payload.title;
-		}
-
-		//now we add the provided feeds to the feedstorage
-		//assumption is that the provider will NOT send duplicate feeds so we just add them to the end before processing order commands
-		//the feedstorage will occur many times if there is no merging
-
-		var feedstorage = { key: '', sortidx: -1, titles: [], sourcetitles: [], providers: [], articles: [], sortkeys: [] };
-
-		//if not added create a new entry
-
-		if (this.consumerstorage[moduleinstance].feedstorage[feedstorekey] == null) {
-
-			var sortkeys = [];	// we only use it here, in the else we push direct to the main storage
-			var sortidx = -1;	// we only use it here, in the else we use the one we store in main storage
-
-			feedstorage.key = feedstorekey;
-			feedstorage.titles = [payload.title];				// add the first title we get, which will be many if this is a merged set of feeds
-			feedstorage.sourcetitles = [payload.sourcetitle];	// add the first sourcetitle we get, which will be many if this is a merged set of feeds
-			feedstorage.providers = [payload.providerid];		// add the first provider we get, whic will be many if there are multiple providers and merged
-
-			//we will have to handle tracking new articles here not in the main module
-
-			payload.payload.forEach(function (article) {
-
-				var sortkey = { key: 0, idx: 0 };
-
-				//add each article and at the same time, depending on how we are sorting this build a key idx pair
-
-				switch (self.consumerstorage[moduleinstance].config.article.ordertype.toLowerCase()) {
-					case "default": //no sorting  but we need the corect indexes later
-						sortkey.idx = sortidx += 1;
-						sortkeys.push(sortkey);
-						break;
-					case "date": ; //drop through to age as identical processing
-					case "age":
-						sortkey.key = article.age;
-						sortkey.idx = sortidx += 1;
-						sortkeys.push(sortkey);
-						break;
-				}
-
-				article['sentdate'] = new Date(); // used for highlight checking
-
-				if (self.consumerstorage[moduleinstance].config.article.cleanedtext) {
-					article.title = self.cleanString(article.title);
-					article.description = self.cleanString(article.description);
-                }
-
-				if (self.consumerstorage[moduleinstance].config.display.sourcenamelength > 0) { //add the source data if requested
-					article.source = article.source.substring(0, self.consumerstorage[moduleinstance].config.display.sourcenamelength);
-				}
-
-				//check to see if we want to drop this article because of a category match
-
-				if (!self.categorymatch(article.categories, moduleinstance)) {
-
-					feedstorage.articles.push(article);
-				}
-
-			});
-
-			feedstorage.sortkeys = sortkeys;
-			feedstorage.sortidx = sortidx;
-
-			this.consumerstorage[moduleinstance].feedstorage[feedstorekey] = feedstorage;
-
-		}
-		else { //it exists so just update any data we need to
-
-			if (this.consumerstorage[moduleinstance].feedstorage[feedstorekey].providers.indexOf(payload.providerid) == -1) {
-				this.consumerstorage[moduleinstance].feedstorage[feedstorekey].providers.push(payload.providerid);
-			}
-
-			if (this.consumerstorage[moduleinstance].feedstorage[feedstorekey].titles.indexOf(payload.title) == -1) {
-				this.consumerstorage[moduleinstance].feedstorage[feedstorekey].titles.push(payload.title);
-			}
-
-			//and we know that the actual articles are unique so just add without checking
-
-			var sortidx = self.consumerstorage[moduleinstance].feedstorage[feedstorekey].sortidx; //make sure we reference the correct location in our output
-
-			payload.payload.forEach(function (article) {
-
-				var sortkey = { key: 0, idx: 0 };
-
-				switch (self.consumerstorage[moduleinstance].config.article.ordertype.toLowerCase()) {
-					case "default": //no sorting but we need the indexes later
-						sortkey.idx = sortidx += 1;
-						self.consumerstorage[moduleinstance].feedstorage[feedstorekey].sortkeys.push(sortkey);
-						break;
-					case "date": ; //drop through to age as identical processing
-					case "age":
-						sortkey.key = article.age;
-						sortkey.idx = sortidx += 1;
-						self.consumerstorage[moduleinstance].feedstorage[feedstorekey].sortkeys.push(sortkey);
-						break;
-				}
-
-				article['sentdate'] = new Date();
-
-				if (self.consumerstorage[moduleinstance].config.article.cleanedtext) {
-					article.title = self.cleanString(article.title);
-					article.description = self.cleanString(article.description);
-				}
-
-				if (self.consumerstorage[moduleinstance].config.display.sourcenamelength > 0) { 
-					article.source = article.source.substring(0, self.consumerstorage[moduleinstance].config.display.sourcenamelength);
-				}
-
-				//check to see if we want to drop this article because of a category match
-
-				if (!self.categorymatch(article.categories, moduleinstance)) {
-					self.consumerstorage[moduleinstance].feedstorage[feedstorekey].articles.push(article);
-				}
-
-			});
-
-			self.consumerstorage[moduleinstance].feedstorage[feedstorekey].sortidx = sortidx;
-
-		}
-
-		//now create a payload in the correct order with multpile titles if required
-
-		//feedstorage: {
-		//	'merged feed': {
-		//		key: 'merged feed',
-		//		titles: [Array],
-		//		providers: [Array],
-		//		articles: [Array]
-		//	}
-		//}
-
-		//so we have received something new, so we send everything we have back to the consumer instance even if merged
-
-		//we process all the available feedstorages that have been loaded with articles
-
-		var articles = [];
-		var titles = [];
-
-		for (var key in self.consumerstorage[moduleinstance].feedstorage) {
-
-			//var titles = self.consumerstorage[moduleinstance].feedstorage[key].titles; //ignore for the time being
-			var sortkeys = self.consumerstorage[moduleinstance].feedstorage[key].sortkeys;
-			
-			switch (this.consumerstorage[moduleinstance].config.article.ordertype.toLowerCase()) {
-				case "default":
-					break;
-				case "date": ; //drop through to age as identical processing
-				case "age":
-					//sort the sort keys, and build a new payload of articles based on the reordered stuff
-					//as sorts are in place we need to copy the sort keys 
-
-					//here we use a simple numeric sort because it is age, will need alphabetic solution later
-
-					if (self.consumerstorage[moduleinstance].config.article.order.toLowerCase() == 'descending') {
-						sortkeys.sort(function (a, b) { return b.key - a.key });
-					}
-					else {
-						sortkeys.sort(function (a, b) { return a.key - b.key });
-					}
-
-					break;
-			}
-
-			if (self.alternatefeedorder) {
-
-				self.consumerstorage[moduleinstance].feedstorage[key]['sortedkeys'] = sortkeys;
-			}
-
-			else
-
-			//now build the output based on the reordered list of sort items indexes.
-
-			{
-				sortkeys.forEach(function (sortkey) {
-
-					articles.push(self.consumerstorage[moduleinstance].feedstorage[key].articles[sortkey.idx]);
-
-				});
-			}
-
-		}
-
-		var feedkeys = [];
-		var feedkeyidx = 0;
-
-		if (this.alternatefeedorder) {
-
-			//iterate through the stored sortedkeys, keyed by feedkey in a 2 demensional fashion
-
-			//1) get the largest array of articles
-
-			var maxarticleslength = 0
-
-			for (var key in self.consumerstorage[moduleinstance].feedstorage) {
-				maxarticleslength = Math.max(maxarticleslength, self.consumerstorage[moduleinstance].feedstorage[key].articles.length);
-				feedkeys[feedkeyidx++] = key;
-			}
-
-			//2) iterate throgh the arrays to build a alternated set of data
-			//		attempt every entry up to the largest one available
-			//		count the number of feeds currently stored using .length of the just stored array of feed keys
-			//		get an index at the feed level
-			//		check that we actually have a sortidx to use (may have gone past the end of this particular feed array of articles)
-			//		then push it to the output article array
-
-			var sortedkeys = []
-
-			for (var lvl1idx = 0; lvl1idx < maxarticleslength; lvl1idx++) {
-
-				for (var lvl2idx = 0; lvl2idx < feedkeys.length; lvl2idx++) {
-
-					var feedkey = feedkeys[lvl2idx];
-
-					sortedkeys = self.consumerstorage[moduleinstance].feedstorage[feedkey].sortedkeys[lvl1idx]
-
-					if (sortedkeys != null) {
-
-						articles.push(self.consumerstorage[moduleinstance].feedstorage[feedkey].articles[sortedkeys.idx]);
-
-					}
-
-				}
-
-			}
-
-		}
-
-		if (self.debug) { self.logger[self.currentmoduleinstance].info("In send articles: " + articles.length); }
-
-		// all data is in correct order so we can send it
-
-		this.sendNotificationToMasterModule("NEW_FEEDS_" + moduleinstance, { payload: { titles: titles, articles: articles } });
-
-	},
-
-	cleanString: function (theString) {
-		var self = this;
-		if (theString == null) { return theString };
-		
-		var cTextClean = theString;
-		cTextClean = cTextClean.replace(/(?:https?|ftp):\/\/[\n\S]+/g, '');
-		cTextClean = cTextClean.replace(/[^\x00-\x7F]/g, '');
-		cTextClean = cTextClean.replace(/\n/g, ' ');
-		cTextClean = cTextClean.replace(/\s+/g, ' ');
-		cTextClean = cTextClean.trim();
-		if (cTextClean.endsWith(':'))
-			cTextClean = cTextClean.substr(0, cTextClean.length - 1);
-		
-		//isprofanity(cTextClean, function (t,words) {
-		//	b = t ? 'contains' : 'does not contain';
-		//	self.logger[self.currentmoduleinstance].info("In cleanString : " + '"' + cTextClean + '" ' + b + ' profanity ' + JSON.stringify(words));
-		//}, 'node_modules/isprofanity/data/profanity.csv', 'node_modules/isprofanity/data/exceptions.csv', 0.8);
-
-		return cTextClean;
-	},
-
-	mergearticles: function (articlelist) {
-
-		//determine if the article is present so we only 
-
-	},
-
-	showstatus: function (moduleinstance) {
-		//console.log("MMM Module: " + moduleinstance);
-		console.log('============================ start of status ========================================');
-
-		console.log('config for consumer: ' + moduleinstance);
-
-		console.log(this.consumerstorage[moduleinstance].config);
-
-		console.log('============================= end of status =========================================');
-
-	},
-
-	showElapsed: function () {
-		endTime = new Date();
-		var timeDiff = endTime - startTime; //in ms
-		// strip the ms
-		timeDiff /= 1000;
-
-		// get seconds 
-		var seconds = Math.round(timeDiff);
-		return (" " + seconds + " seconds");
+		this.logger[null] = LOG.createLogger("MMM-FeedProvider-Twitter-node_helper" + ".log", this.name);
+		this.queue = new QUEUE.queue("single", false);
+		this.maxfeeddate = new Date(0); //used for date checking of posts
 	},
 
 	stop: function () {
-		//console.log(this.consumerstorage);
-		for (var key in this.consumerstorage) {
-			//console.log(this.consumerstorage[key])
-			for (var id in this.consumerstorage[key].feedstorage) {
-				//console.log("K:" + key + " I: " + id);
-				//console.log(this.consumerstorage[key].feedstorage[id].providers);
-				//console.log(this.consumerstorage[key].feedstorage[id].titles);
-				//console.log(this.consumerstorage[key].feedstorage[id].articles);
+		console.log("Shutting down node_helper");
+	},
+
+	setconfig: function (moduleinstance, config) {
+
+		if (this.debug) { this.logger[moduleinstance].info("In setconfig: " + moduleinstance + " " + config); }
+
+		//store a local copy so we dont have keep moving it about
+
+		providerstorage[moduleinstance] = { config: config, trackingfeeddates: [] };
+
+		var self = this;
+
+		//process the feed details into the local feed tracker
+
+		providerstorage[moduleinstance].config.feeds.forEach(function (configfeed) {
+
+			var feed = { sourcetitle: '', lastFeedDate: '', searchterm: '', latestfeedpublisheddate: new Date(0) };
+
+			//store the actual timestamp to start filtering, this will change as new feeds are pulled to the latest date of those feeds
+			//if no date is available on a feed, then the current latest date of a feed published is allocated to it
+
+			feed.lastFeedDate = self.calcTimestamp(configfeed.oldestage);
+			feed.searchHashtag = configfeed.searchHashtag;
+			feed.sourcetitle = configfeed.feedtitle;
+
+			providerstorage[moduleinstance].trackingfeeddates.push(feed);
+
+		});
+
+	},
+
+	calcTimestamp: function (age) {
+
+		//calculate the actual timestamp to use for filtering feeds, 
+		//options are timestamp format, today for midnight + 0.0001 seconds today, or age in minutes
+		//determine the format of the data in age
+
+		var filterDate = new Date();
+
+		if (typeof (age) == 'number') {
+
+			filterDate = new Date(filterDate.getTime() - (age * 60 * 1000));
+
+		}
+		else { //age is hopefully a string ha ha
+
+			if (age.toLowerCase() == 'today') {
+				filterDate = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate(), 0, 0, 0, 0)
+			}
+
+			else { //we assume the user entered a correct date - we can try some basic validation
+
+				if (moment(age, "YYYY-MM-DD HH:mm:ss", true).isValid()) {
+					filterDate = new Date(age);
+				}
+				else {
+
+					console.log(this.name + " Invalid date provided for filter age of feeds:" + age.toString());
+				}
+
 			}
 		}
-		console.log("Shutting down node_helper");
-		//this.connection.close();
+
+		return filterDate;
+
+	},
+
+	getconfig: function () { return config; },
+
+	reset: function (moduleinstance) {
+
+		//clear the date we have been using to determine the latest data pulled for each feed
+
+		//console.log(providerstorage[id].trackingfeeddates);
+
+		providerstorage[moduleinstance].trackingfeeddates.forEach(function (feed) {
+
+			//console.log(feed);
+
+			feed['latestfeedpublisheddate'] = new Date(0);
+
+			//console.log(feed);
+
+		});
+
+		//console.log(providerstorage[moduleinstance].trackingfeeddates);
+
 	},
 
 	socketNotificationReceived: function (notification, payload) {
-		//console.log(this.name + " NODE_HELPER received a socket notification: " + notification + " - Payload: " + payload);
 
-		//we will receive a payload with the consumerid in it so we can store data and respond to the correct instance of
-		//the caller - i think that this may be possible!!
+		var self = this;
 
 		if (this.logger[payload.moduleinstance] == null) {
 
@@ -397,18 +164,350 @@ module.exports = NodeHelper.create({
 
 		};
 
-		this.currentmoduleinstance = payload.moduleinstance;
+		if (this.debug) {
+			this.logger[payload.moduleinstance].info(this.name + " NODE HELPER notification: " + notification + " - Payload: ");
+			this.logger[payload.moduleinstance].info(JSON.stringify(payload));
+		}
+
+		//we can receive these messages:
+		//
+		//RESET: clear any date processing or other so that all available stuff is returned to the module
+		//CONFIG: we get our copy of the config to look after
+		//UPDATE: request for any MORE stuff that we have not already sent
+		//
 
 		switch (notification) {
-			case "CONFIG": this.setconfig(payload); break;
-			case "RESET": this.reset(payload); break;
-			case "AGGREGATE_THIS":this.processfeeds(payload); break;
-			case "STATUS": this.showstatus(payload); break;
+			case "CONFIG":
+				this.setconfig(payload.moduleinstance, payload.config);
+				break;
+			case "RESET":
+				this.reset(payload);
+				break;
+			case "UPDATE":
+				//because we can get some of these in a browser refresh scenario, we check for the
+				//local storage before accepting the request
+
+				if (providerstorage[payload.moduleinstance] == null) { break; } //need to sort this out later !!
+				self.processtweets(payload.moduleinstance, payload.providerid);
+				break;
+			case "STATUS":
+				this.showstatus(payload.moduleinstance);
+				break;
 		}
+
 	},
 
-	sendNotificationToMasterModule: function(stuff, stuff2){
+	showstatus: function (moduleinstance) {
+
+		console.log('============================ start of status ========================================');
+
+		console.log('config for provider: ' + moduleinstance);
+
+		console.log(providerstorage[moduleinstance].config);
+
+		console.log('feeds for provider: ' + moduleinstance);
+
+		console.log(providerstorage[moduleinstance].trackingfeeddates);
+
+		console.log('============================= end of status =========================================');
+
+	},
+
+	processtweets: function (moduleinstance, providerid) {
+
+		var self = this;
+		var feedidx = -1;
+
+		if (this.debug) { this.logger[moduleinstance].info("In processfeeds: " + moduleinstance + " " + providerid); }
+
+		providerstorage[moduleinstance].trackingfeeddates.forEach(function (feed) {
+
+			if (self.debug) {
+				self.logger[moduleinstance].info("In process feed: " + JSON.stringify(feed));
+				self.logger[moduleinstance].info("In process feed: " + moduleinstance);
+				self.logger[moduleinstance].info("In process feed: " + providerid);
+				self.logger[moduleinstance].info("In process feed: " + feedidx);
+				self.logger[moduleinstance].info("building queue " + self.queue.queue.length);
+			}
+
+			//we have to pass the providerid as we are going async now
+
+			self.queue.addtoqueue(function () { self.fetchfeed(feed, moduleinstance, providerid, ++feedidx); });
+
+		});
+
+		this.queue.startqueue(providerstorage[moduleinstance].config.waitforqueuetime);
+
+	},
+
+	sendNotificationToMasterModule: function (stuff, stuff2) {
 		this.sendSocketNotification(stuff, stuff2);
-	}
+	},
+
+	getParams: function (str) {
+
+		var params = str.split(';').reduce(function (params, param) {
+
+			var parts = param.split('=').map(function (part) { return part.trim(); });
+
+			if (parts.length === 2) {
+
+				params[parts[0]] = parts[1];
+
+			}
+
+			return params;
+
+		}, {});
+
+		return params;
+
+	},
+
+	done: function (err) {
+
+		if (err) {
+
+			console.log(err, err.stack);
+
+		}
+
+	},
+
+	send: function (moduleinstance, providerid, source, feeds) {
+
+		var payloadforprovider = { providerid: providerid, source: source, payloadformodule: feeds.items }
+
+		if (this.debug) {
+			this.logger[moduleinstance].info("In send, source, feeds // sending items this time: " + feeds.items.length );
+			this.logger[moduleinstance].info(JSON.stringify(source));
+			this.logger[moduleinstance].info(JSON.stringify(feeds));
+		}
+
+		if (feeds.items.length > 0) {
+			this.sendNotificationToMasterModule("UPDATED_STUFF_" + moduleinstance, payloadforprovider);
+		}
+
+		this.queue.processended();
+
+	},
+
+	fetchfeed: function (feed, moduleinstance, providerid, feedidx) {
+
+		if (this.debug) {
+			this.logger[moduleinstance].info("In fetch feed: " + JSON.stringify(feed));
+			this.logger[moduleinstance].info("In fetch feed: " + moduleinstance);
+			this.logger[moduleinstance].info("In fetch feed: " + providerid);
+			this.logger[moduleinstance].info("In fetch feed: " + feedidx);
+		}
+
+		this.maxfeeddate = new Date(0);
+
+		var rssitems = new RSS.RSSitems();
+
+		//use these in the feedparser area
+		var sourcetitle = feed.sourcetitle;
+		//we use twitter module to create the url for us
+
+		var theConfig = providerstorage[moduleinstance].config;
+
+		var client = new Twitter({
+			consumer_key: theConfig.consumer_key,
+			consumer_secret: theConfig.consumer_secret,
+			access_token_key: theConfig.access_token_key,
+			access_token_secret: theConfig.access_token_secret
+		});
+
+		// this to self
+		var self = this;
+		// prepare the twitter client param, clear query and params
+		var query = '';
+		var params = {};
+
+		var languageParam = '';
+		if (!theConfig.language == '') {
+			params = {
+				q: feed.searchHashtag,
+				count: theConfig.totalTweetsPerUpdate,
+				lang: theConfig.language,
+			}
+		}
+		else {
+			params = {
+				q: feed.searchHashtag,
+				count: theConfig.totalTweetsPerUpdate
+			}
+		}
+
+		query = 'search/tweets';
+
+		//call twitter client based on query and params
+
+		client.get(query, params, function (error, tweets, response) {
+			// if no error, send tweets for processing
+
+			if (!error) {
+
+				//create a psuedo meta object
+				if (self.debug) { self.logger[moduleinstance].info("meta: "); }
+
+				//rsssource.title = meta.title;
+				//rsssource.sourcetitle = sourcetitle;
+				//rsssource.url = feedurl;
+
+				tweets = tweets['statuses']; //the actual tweets required are in here
+
+				self.parseTweets(theConfig, tweets, feed, moduleinstance, rssitems); 
+
+				if (self.debug) { self.logger[moduleinstance].info("tweets all pushed"); }
+
+				for (var idx = 0; idx < rssitems.length; idx++) {
+
+					if (rssitems[idx].imageURL != null) {
+						if (RSS.checkfortrackingpixel(rssitems[idx].imageURL, moduleinstance)) {
+							rssitems[idx].imageURL = null;
+						}
+					}
+				}
+
+				if (new Date(0) < self.maxfeeddate) {
+					providerstorage[moduleinstance].trackingfeeddates[feedidx]['latestfeedpublisheddate'] = self.maxfeeddate;
+				}
+
+				self.send(moduleinstance, providerid, rsssource, rssitems);
+
+				self.done();
+
+			}
+			// otherwise process error
+			else {
+				self.processError();
+			}
+		});
+
+	},
+
+	processError: function (err) {
+
+		if (err) {
+
+			console.log(err, err.stack);
+
+		}
+
+	},
+
+	parseTweets: function (theConfig, tweets, feed, moduleinstance, rssitems) {
+
+		var self = this;
+
+		var includedTweetList = [];
+		var userTweetCountList = {};
+		var nowTime = Date.now();
+
+		if (self.debug) { self.logger[moduleinstance].info("feedparser readable: "); }
+
+		for (var cIndex = 0; cIndex < tweets.length; cIndex++) {
+
+			var rssarticle = new RSS.RSSitem();
+			var post = {};
+
+			var cTweet = tweets[cIndex]; //first we convert to our standard post format
+
+			post['pubdate'] = new Date(cTweet.created_at);
+			post['title'] = cTweet.text;
+			post['description'] = '';
+			post['categories'] = ['twitter', 'tweet'];
+			post['source'] = cTweet.user.screen_name;
+			post['image'] = {};
+
+			var cIsQuoteStatus = cTweet.is_quote_status;
+			var cIsRetweeted = (cTweet.retweeted_status !== undefined);
+			var cHasMedia = (cTweet.entities.media !== undefined);
+
+			//post.image.url
+
+			var cHasURLs = (cTweet.entities.urls.length !== 0);
+
+			var cTweetDoInclude = true;
+
+			// if set to exclude quote and has a quote, exclude
+			if (theConfig.excludeTweetsWithQuotes && cIsQuoteStatus)
+				cTweetDoInclude = false;
+			if (this.debug) { console.log(this.name + " #### cTweetDoInclude 1" + cTweetDoInclude) };
+			// if set to exclude retweets and is a retweet, exclude
+			if (theConfig.excludeRetweets && cIsRetweeted)
+				cTweetDoInclude = false;
+			if (this.debug) { console.log(this.name + " #### cTweetDoInclude 2" + cTweetDoInclude) };
+			// if set to exclude tweets with media has media, exclude
+			if (theConfig.excludeMediaTweets && cHasMedia)
+				cTweetDoInclude = false;
+			if (this.debug) { console.log(this.name + " #### cTweetDoInclude 3" + cTweetDoInclude) };
+			// if set to exclude tweets with links and has a link, exclude
+			if (theConfig.excludeLinkTweets && cHasURLs)
+				cTweetDoInclude = false;
+			if (this.debug) { console.log(this.name + " #### cTweetDoInclude 4" + cTweetDoInclude) };
+			// if set to exclude short tweets and is short, exclude
+			if ((theConfig.excludeTweetLengthLessThan > 0) &&
+				(cTweet.text.length < theConfig.excludeTweetLengthLessThan))
+				cTweetDoInclude = false;
+			if ((theConfig.excludeTweetsWithoutText.length > 0) &&
+				(this.doesNotHaveRequiredText(cTweet.text, theConfig)))
+				cTweetDoInclude = false;
+			if (this.debug) { console.log(this.name + " #### cTweetDoInclude 8" + cTweetDoInclude) };
+
+			//end of converting the tweet into a post format for standard processing
+
+			if (this.debug) { self.logger[moduleinstance].info("feedparser post read: " + JSON.stringify(post.title)); }
+
+			//ignore any feed older than feed.lastFeedDate or older than the last feed sent back to the modules
+			//feed without a feed will be given the current latest feed data
+
+			//because the feeds can come in in reverse date order, we only update the latest feed date at the end in send
+
+			if (post.pubdate == null) {
+				post.pubdate = new Date(feed.latestfeedpublisheddate.getTime() + 1);
+				console.log("Article missing a date - so used: " + feed['latestfeedpublisheddate']);
+			}
+
+			if (post.pubdate >= feed.lastFeedDate && post.pubdate > feed.latestfeedpublisheddate) {
+
+				rssarticle.id = rssarticle.gethashCode(post.title);
+				rssarticle.title = post.title;
+
+				rssarticle.pubdate = post.pubdate;
+				self.maxfeeddate = new Date(Math.max(self.maxfeeddate, post.pubdate));
+
+				rssarticle.description = post.description;
+				rssarticle.age = rssarticle.getage(new Date(), rssarticle.pubdate); //in microseconds
+				rssarticle.categories = post.categories;
+				rssarticle.source = post.source;
+
+				//go find an image
+
+				//https://pbs.twimg.com/media/EV5VJb9XQAAgAUX?format=jpg&name=large
+
+				if (cHasMedia) {
+
+					//find the url
+
+					rssarticle.imageURL = cTweet.entities.media[0].media_url_https + "?format=jpg&name=small"
+
+                }
+
+				if (self.debug) { self.logger[moduleinstance].info("article " + JSON.stringify(rssarticle)); }
+
+				if (cTweetDoInclude) {
+					rssitems.items.push(rssarticle);
+				}
+
+			}
+			else {
+				if (self.debug) { self.logger[moduleinstance].info("Allready sent this item or it is too old - just like me"); }
+			}
+
+		} //end of processing this particular batch of tweets
+
+	},
 
 });
