@@ -38,6 +38,7 @@ var UTILITIES = require('../MMM-FeedUtilities/utilities');
 // structures
 
 var rsssource = new RSS.RSSsource();
+rsssource.sourceiconclass = 'fa fa-twitter twitterblue';
 
 // local variables, held at provider level as this is a common module
 //these are largely for the authors reference and are not actually used in thsi code
