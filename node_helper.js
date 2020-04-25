@@ -35,11 +35,6 @@ var RSS = require('../MMM-FeedUtilities/RSS');
 var QUEUE = require('../MMM-FeedUtilities/queueidea');
 var UTILITIES = require('../MMM-FeedUtilities/utilities');
 
-// structures
-
-var rsssource = new RSS.RSSsource();
-rsssource.sourceiconclass = 'fa fa-twitter twitterblue';
-
 // local variables, held at provider level as this is a common module
 //these are largely for the authors reference and are not actually used in thsi code
 
@@ -305,6 +300,12 @@ module.exports = NodeHelper.create({
 		this.maxfeeddate = new Date(0);
 
 		var rssitems = new RSS.RSSitems();
+		// structures
+
+		var rsssource = new RSS.RSSsource();
+		rsssource.sourceiconclass = 'fa fa-twitter twitterblue';
+		rsssource.title = feed.sourcetitle;
+		rsssource.sourcetitle = feed.sourcetitle;
 
 		//use these in the feedparser area
 		var sourcetitle = feed.sourcetitle;
