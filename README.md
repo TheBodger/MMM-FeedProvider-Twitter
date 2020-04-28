@@ -71,8 +71,8 @@ To use this module, add the following configuration block to the modules array i
 | `access_token_secret`         | *Required* - A Twitter provided authentication secret<br><br> **Possible values:** see the URL above to create a secret<br> **Default value:** none
 | `datarefreshinterval`            | *Optional* - milliseconds to pause before checking for new data in the feeds.<br><br> **Possible values:** a number in milliseconds <br> **Default value:** `300000` 
 | `Filters`            |
-| `totalTweetsPerUpdate`            | *Optional* - The number of tweets to pull during each update<br><br> **Possible values:** a number (nax 100)<br> **Default value:** `25` 
-| `excludeTweetsWithQuotes`            | *Optional* - exclude any tweets without quotes<br><br> **Possible values:** `true`,`false`<br> **Default value:** `false` 
+| `totalTweetsPerUpdate`            | *Optional* - The number of tweets to pull during each update<br><br> **Possible values:** a number (max 100)<br> **Default value:** `25` 
+| `excludeTweetsWithQuotes`            | *Optional* - exclude any tweets with quotes<br><br> **Possible values:** `true`,`false`<br> **Default value:** `false` 
 | `excludeRetweets`            | *Optional* - exclude any retweeted tweets (RT in title)<br><br> **Possible values:** `true`,`false`<br> **Default value:** `true` 
 | `excludeMediaTweets`            | *Optional* - exclude any tweets containing media (images,video etc)<br><br> **Possible values:** `true`,`false`<br> **Default value:** `false` 
 | `excludeLinkTweets`            | *Optional* - exclude any tweets that are a link to other tweets<br><br> **Possible values:** `true`,`false`<br> **Default value:** `false` 
@@ -82,8 +82,8 @@ To use this module, add the following configuration block to the modules array i
 | `feeds`        | *required* - See below for the feed format
 | `waitforqueuetime`            |*Ignore* -  Queue delay between ending one queue item and starting the next <br><br> **Possible values:** a number in milliseconds. <br> **Default value:** `10`
 | `Feed Format`            |
-| `feedname`            |*Required* -  Name of the feed for reference purposes<br><br> **Possible values:** Any unique string. <br> **Default value:** none
-| `feedtitle`            |*Required* -  Title of the feed that will be displayed as the source if enabled in the MMM-FeedDisplay output.<br><br> **Possible values:** Any unique string. <br> **Default value:** none
+| `feedname`            |*Required* -  Name of the feed for reference purposes.<br><br> **Possible values:** Any unique string. <br> **Default value:** none
+| `feedtitle`            |*Required* -  Title of the feed for reference purposes.<br><br> **Possible values:** Any unique string. <br> **Default value:** none
 | `searchHashtag`            |*Required* -  search term to use to find tweets (can include a leading# or @) <br><br> **Possible values:** any search string, hashtag or named tweet, can include OR to provide multiple terms.<br> **Default value:** none
 | `oldestage`            |*Required* -  Filter out any articles older than this "age" (As defined by the pubdate in the Twitter feed). <br><br> **Possible values:** 'today' or a number of minutes or a valid date(See [Moment.js formats](http://momentjs.com/docs/#/parsing/string-format/). <br> **Default value:** none
 
