@@ -24,8 +24,6 @@ Module.register("MMM-FeedProvider-Twitter", {
         consumer_secret: null,
         access_token_key: null,
         access_token_secret: null,
-        screenName: null,
-        listToShow: 'TIMELINE', //SEARCH
         // optional
         datarefreshinterval: 5000*60,
         totalTweetsPerUpdate: 25,
@@ -35,7 +33,6 @@ Module.register("MMM-FeedProvider-Twitter", {
         excludeLinkTweets: false,
         excludeTweetLengthLessThan: 16,
         excludeTweetsWithoutText: [],
-        allowSpecialCharacters: false,
         language: '', //leave empty and only use if requested
         feeds: [
             { feedname: 'TKMaxx', feedtitle: 'TKMaxx', searchHashtag: 'YYYY', oldestage: '2020-04-01 00:00:01' },
