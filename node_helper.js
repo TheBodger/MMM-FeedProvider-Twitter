@@ -1,3 +1,12 @@
+/* global Module, MMM-FeedProvider-Twitter */
+
+/* Magic Mirror
+ * Module: node_helper
+ *
+ * By Neil Scott
+ * MIT Licensed.
+ */
+
 //this loads tweets depending on its config when called to from the main module
 //to minimise activity, it will track what data has been already sent back to the module
 //and only send the delta each time

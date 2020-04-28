@@ -1,3 +1,12 @@
+/* global Module, MMM-FeedProvider-Twitter */
+
+/* Magic Mirror
+ * Module: MMM-FeedProvider-Twitter
+ *
+ * By Neil Scott
+ * MIT Licensed.
+ */
+
 var startTime = new Date();
 
 var feedDisplayPayload = { consumerid: '', providerid: '', payload: '' };
