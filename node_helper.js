@@ -367,17 +367,19 @@ module.exports = NodeHelper.create({
 
 				if (self.debug) { self.logger[moduleinstance].info("tweets all pushed"); }
 
-				for (var idx = 0; idx < rssitems.length; idx++) {
+				for (var idx = 0; idx < rssitems.items.length; idx++) {
 
-					if (rssitems[idx].imageURL != null) {
-						if (RSS.checkfortrackingpixel(rssitems[idx].imageURL, moduleinstance)) {
-							rssitems[idx].imageURL = null;
+					var item = rssitems.items[idx];
+
+					if (item.imageURL != null) {
+						if (RSS.checkfortrackingpixel(item.imageURL, moduleinstance)) {
+							item.imageURL = null;
 						}
 					}
 
 					if (theConfig.profanitycheck) {
-						rssitems[idx].title = UTILITIES.profanitycleaner(rssitems[idx].title);
-						rssitems[idx].title = UTILITIES.profanitycleaner(rssitems[idx].description);
+						item.title = UTILITIES.profanitycleaner(item.title);
+						item.description = UTILITIES.profanitycleaner(item.description);
 					}
 
 				}
