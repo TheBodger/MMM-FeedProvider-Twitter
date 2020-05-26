@@ -42,6 +42,7 @@ Module.register("MMM-FeedProvider-Twitter", {
         excludeLinkTweets: false,
         excludeTweetLengthLessThan: 16,
         excludeTweetsWithoutText: [],
+        profanitycheck:true,
         language: '', //leave empty and only use if requested
         feeds: [
             { feedname: 'TKMaxx', feedtitle: 'TKMaxx', searchHashtag: 'YYYY', oldestage: '2020-04-01 00:00:01' },

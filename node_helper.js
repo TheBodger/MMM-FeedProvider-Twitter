@@ -359,12 +359,7 @@ module.exports = NodeHelper.create({
 
 			if (!error) {
 
-				//create a psuedo meta object
 				if (self.debug) { self.logger[moduleinstance].info("meta: "); }
-
-				//rsssource.title = meta.title;
-				//rsssource.sourcetitle = sourcetitle;
-				//rsssource.url = feedurl;
 
 				tweets = tweets['statuses']; //the actual tweets required are in here
 
@@ -379,6 +374,12 @@ module.exports = NodeHelper.create({
 							rssitems[idx].imageURL = null;
 						}
 					}
+
+					if (theConfig.profanitycheck) {
+						rssitems[idx].title = UTILITIES.profanitycleaner(rssitems[idx].title);
+						rssitems[idx].title = UTILITIES.profanitycleaner(rssitems[idx].description);
+					}
+
 				}
 
 				if (new Date(0) < self.maxfeeddate) {
