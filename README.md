@@ -29,9 +29,9 @@ To install the module, use your terminal to:
 
 ### Authorisation (as at time of writing)
 
-This stackoverflow post gives a good overview of how to setup and obtain the neccessary keys to enable this module to function.
+This stackoverflow post (Getting new Twitter API consumer and secret keys - https://stackoverflow.com/questions/1808855/getting-new-twitter-api-consumer-and-secret-keys) gives a good overview of how to setup and obtain the neccessary keys to enable this module to function.
 
-When your create your project, you need to upgrade it to an elavated level. If the project is left as its default essential level, then the module wont work and returns no data nor errors.
+When your create your project, you need to upgrade it to an elavated level. If the project is left as its default essential level, then the module wont work and returns no data nor errors. If you have already generated keys before elevating the project, revoke all keys, then regenerate each set in turn.
 
 ### MagicMirror² Configuration
 
