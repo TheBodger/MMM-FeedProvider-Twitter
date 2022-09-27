@@ -2,8 +2,6 @@
 
 This magic mirror module is a MMM-FeedProvider module that is part of the the MMM-Feedxxx interrelated modules. 
 
-At the moment, the twitter authorisation process doesnt work with the nodejs twitter module. a solution is being sought
-
 For an overview of these modules see the README.md in https://github.com/TheBodger/MMM-FeedDisplay.
 
 the -Twitter module will monitor and format any Tweets it is configured to search for. It will extract text and the first Image that is embbeded within a tweet.
@@ -28,6 +26,12 @@ To install the module, use your terminal to:
 2. Clone the module:<br />`git clone https://github.com/TheBodger/MMM-FeedProvider-Twitter`
 
 ## Using the module
+
+### Authorisation (as at time of writing)
+
+This stackoverflow post gives a good overview of how to setup and obtain the neccessary keys to enable this module to function.
+
+When your create your project, you need to upgrade it to an elavated level. If the project is left as its default essential level, then the module wont work and returns no data nor errors.
 
 ### MagicMirror² Configuration
 
